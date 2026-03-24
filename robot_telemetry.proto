@@ -1,0 +1,42 @@
+syntax = "proto3";
+package robot.v1;
+
+message Header {
+  string robot_id = 1;        // e.g: "robot_sim"
+  uint64 timestamp_ns = 2;    // ns (monotonic ou epoch)
+  uint32 seq = 3;             // incremental counter (optional)
+}
+
+message Vec3f {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message MotorState {
+  string motor_id = 1;                  // "motor1" / "motor2"
+  uint32 tics = 2;                      // raw encoder tick counter
+  int32 rpm = 3;                        // RPM (motor)
+  int32 temperature_c = 4;              // °C
+  int32 voltage_power_stage_mv = 5;     // mV
+  int32 current_power_stage_ma = 6;     // mA
+}
+
+// Dashboard-ready snapshot
+message TelemetryState {
+  Header header = 1;
+
+  // IMU
+  string imu_id = 10;     // "imu0"
+  Vec3f acc_g = 11;       // g
+  Vec3f gyro_dps = 12;    // deg/s
+
+  // Tilt
+  string tilt_id = 20;    // "tilt0"
+  Vec3f tilt_deg = 21;    // deg
+  uint32 tilt_status = 22; // 0 normal, 1 reinitializing
+
+  // Motors
+  MotorState motor1 = 30;
+  MotorState motor2 = 31;
+}

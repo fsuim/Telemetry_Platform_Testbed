@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Robot Telemetry Monitor</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a33;
+      --panel2:#0f1630;
+      --text:#e8ecff;
+      --muted:#aab3da;
+      --ok:#20c997;
+      --warn:#ffc107;
+      --bad:#ff4d6d;
+      --border:rgba(255,255,255,.10);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background: radial-gradient(1200px 700px at 20% 10%, #1b2b6a33, transparent 55%),
+                  radial-gradient(900px 600px at 80% 0%, #7c3aed22, transparent 55%),
+                  var(--bg);
+      color:var(--text);
+      font-family:var(--sans);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background: linear-gradient(to bottom, rgba(11,16,32,.95), rgba(11,16,32,.75));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--border);
+    }
+    .wrap{ max-width: 1200px; margin: 0 auto; padding: 16px; }
+    h1{ font-size: 18px; margin: 0 0 8px 0; letter-spacing:.2px; }
+    .sub{ color:var(--muted); font-size: 13px; line-height: 1.4; }
+
+    .grid{ display:grid; gap:12px; grid-template-columns: 1fr; }
+    @media (min-width: 900px){
+      .grid{ grid-template-columns: 360px 1fr; }
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .card h2{ margin:0 0 10px 0; font-size:14px; color:#dbe3ff; }
+
+    .row{ display:flex; gap:8px; flex-wrap:wrap; }
+    label{ font-size:12px; color:var(--muted); display:block; margin: 0 0 4px 0; }
+    input, select, button{
+      font-family: var(--sans);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      padding: 10px 10px;
+      outline: none;
+    }
+    input{ width: 100%; }
+    button{ cursor:pointer; }
+    button.primary{ background: rgba(32,201,151,.20); border-color: rgba(32,201,151,.35); }
+    button.warn{ background: rgba(255,193,7,.16); border-color: rgba(255,193,7,.35); }
+    button.danger{ background: rgba(255,77,109,.16); border-color: rgba(255,77,109,.35); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.18);
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .dot{ width:9px; height:9px; border-radius:999px; background: var(--bad); box-shadow: 0 0 0 3px rgba(255,77,109,.15); }
+    .dot.ok{ background: var(--ok); box-shadow: 0 0 0 3px rgba(32,201,151,.15); }
+    .dot.warn{ background: var(--warn); box-shadow: 0 0 0 3px rgba(255,193,7,.12); }
+
+    .kv{ display:grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    .kv .k{ font-size:12px; color:var(--muted); }
+    .kv .v{ font-family: var(--mono); font-size:12px; color:var(--text); text-align:right; }
+
+    .sensorGrid{ display:grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 900px){
+      .sensorGrid{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .triple{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .val{
+      background: rgba(0,0,0,.22);
+      border:1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .val .t{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .val .n{ font-family: var(--mono); font-size: 14px; }
+
+    .tableWrap{ overflow:auto; border-radius: 12px; border: 1px solid var(--border); }
+    table{ width:100%; border-collapse: collapse; min-width: 860px; }
+    thead th{
+      position: sticky; top: 0;
+      background: rgba(0,0,0,.30);
+      backdrop-filter: blur(6px);
+      text-align:left;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody td{
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      white-space: nowrap;
+    }
+    tbody tr:hover{ background: rgba(255,255,255,.03); }
+
+    canvas{ width:100%; height:70px; border-radius: 12px; border:1px solid var(--border); background: rgba(0,0,0,.18); }
+
+    .hint{ font-size: 12px; color: var(--muted); line-height: 1.35; }
+    code.inline{ font-family: var(--mono); background: rgba(255,255,255,.06); padding: 2px 6px; border-radius: 8px; border:1px solid rgba(255,255,255,.08); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Robot Telemetry Monitor</h1>
+      <div class="sub">
+        Connects to the <code class="inline">telemetry_gateway</code> WebSocket and displays IMU and Tilt data in real time + history (SQLite).
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <section class="card">
+        <h2>Connection</h2>
+
+        <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div class="pill"><span id="dot" class="dot"></span><span id="connLabel">disconnected</span></div>
+          <div class="pill">last msg: <span id="lastMsg">—</span></div>
+        </div>
+
+        <div class="row">
+          <div style="flex: 1 1 160px;">
+            <label>Host</label>
+            <input id="host" placeholder="localhost" />
+          </div>
+          <div style="width: 120px;">
+            <label>Port</label>
+            <input id="port" type="number" min="1" max="65535" />
+          </div>
+          <div style="width: 120px;">
+            <label>Path</label>
+            <input id="path" placeholder="/" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button id="btnConnect" class="primary">Connect</button>
+          <button id="btnDisconnect" class="danger" disabled>Disconnect</button>
+          <button id="btnPause" class="warn" disabled>Pause</button>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin:12px 0;"/>
+
+        <h2>History</h2>
+        <div class="row">
+          <div style="width: 160px;">
+            <label>Last N samples</label>
+            <input id="lastN" type="number" min="1" max="5000" value="300" />
+          </div>
+          <div style="flex:1; display:flex; gap:8px; align-items:flex-end;">
+            <button id="btnHistory" class="primary" disabled>Load history</button>
+            <button id="btnClear" class="danger">Clear screen</button>
+          </div>
+        </div>
+
+        <div class="hint" style="margin-top:10px;">
+          Tip (WSL2): run the gateway with <code class="inline">--ws-port 8080</code> and open this page in Windows at <code class="inline">http://localhost:8000</code>.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Latest sample</h2>
+        <div class="kv" style="margin-bottom:10px;">
+          <div class="k">robot_id</div><div id="vRobot" class="v">—</div>
+          <div class="k">imu_id</div><div id="vImu" class="v">—</div>
+          <div class="k">tilt_id</div><div id="vTilt" class="v">—</div>
+          <div class="k">seq</div><div id="vSeq" class="v">—</div>
+          <div class="k">tilt_status</div><div id="vStatus" class="v">—</div>
+          <div class="k">t (received)</div><div id="vTime" class="v">—</div>
+        </div>
+
+        <div class="sensorGrid">
+          <div>
+            <h2 style="margin-top:0;">IMU</h2>
+            <div class="triple">
+              <div class="val"><div class="t">accel.x (g)</div><div id="ax" class="n">—</div></div>
+              <div class="val"><div class="t">accel.y (g)</div><div id="ay" class="n">—</div></div>
+              <div class="val"><div class="t">accel.z (g)</div><div id="az" class="n">—</div></div>
+              <div class="val"><div class="t">gyro.x (dps)</div><div id="gx" class="n">—</div></div>
+              <div class="val"><div class="t">gyro.y (dps)</div><div id="gy" class="n">—</div></div>
+              <div class="val"><div class="t">gyro.z (dps)</div><div id="gz" class="n">—</div></div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <label>Accel |g| (sparkline)</label>
+              <canvas id="cAccel" width="600" height="140"></canvas>
+            </div>
+            <div style="margin-top:10px;">
+              <label>Gyro |dps| (sparkline)</label>
+              <canvas id="cGyro" width="600" height="140"></canvas>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin-top:0;">Tilt</h2>
+            <div class="triple">
+              <div class="val"><div class="t">tilt.x (deg)</div><div id="tx" class="n">—</div></div>
+              <div class="val"><div class="t">tilt.y (deg)</div><div id="ty" class="n">—</div></div>
+              <div class="val"><div class="t">tilt.z (deg)</div><div id="tz" class="n">—</div></div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <label>Tilt.x (deg) (sparkline)</label>
+              <canvas id="cTilt" width="600" height="140"></canvas>
+            </div>
+
+            <div class="hint" style="margin-top:10px;">
+              Expected messages:
+              <div style="margin-top:6px; font-family:var(--mono); font-size:12px; opacity:.9;">
+                <div>{"type":"telemetry", ...}</div>
+                <div>{"type":"history","items":[...]}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin:12px 0;"/>
+
+        <h2>Buffer (latest samples)</h2>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>t (s)</th>
+                <th>seq</th>
+                <th>acc (g)</th>
+                <th>gyro (dps)</th>
+                <th>tilt (deg)</th>
+                <th>tilt_status</th>
+                <th>ids</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
