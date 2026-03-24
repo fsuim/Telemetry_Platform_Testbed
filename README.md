@@ -1,6 +1,6 @@
 # Artifact Evaluation Guide: MQTT + Protobuf-C Telemetry Testbed
 
-This repository contains a **lightweight, reproducible telemetry testbed** used in our paper **submitted** to the [AIM 2026]([https://www.ntnu.edu/fusion2026](https://aim2026.com/)) conference.  
+This repository contains a **lightweight, reproducible telemetry testbed** used in our paper **submitted** to the [AIM 2026](https://aim2026.com/)) conference.  
 
 ## What you will test
 
