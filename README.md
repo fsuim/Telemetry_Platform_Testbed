@@ -1,344 +1,255 @@
-# Artifact Evaluation Guide: MQTT + Protobuf-C Telemetry Testbed
+# Telemetry_Platform_Testbed
 
-This repository contains a **lightweight, reproducible telemetry testbed** used in our paper **submitted** to the [AIM 2026](https://aim2026.com/)) conference.  
+A lightweight telemetry platform for **interface-level evaluation of supervisory telemetry systems** under degraded communication conditions.
 
-## What you will test
+This repository accompanies our AIM 2026 paper on **replay-assisted technical evaluation of supervisory telemetry interfaces**. It is based on [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed), but the **experimental design, impairment scenarios, UI logging workflow, and evaluation purpose are different** in this version.
 
-You will run three components:
+## Overview
 
-1. **`robot_sim`** — publishes telemetry to an MQTT broker:
-   - **RAW sensor topics** (binary payloads on separate topics)
-   - **Snapshot** (a consolidated Protobuf message published periodically)
+The platform has three main parts:
 
-2. **`telemetry_gateway`** — subscribes to snapshots, **logs to SQLite (WAL)**, and exposes a **WebSocket** stream (JSON) for the UI:
-   - live stream
-   - “last N” replay from SQLite
+- **`robot_sim`**  
+  Publishes telemetry snapshots to MQTT.
 
-3. **`ui/`** — a static web page served over HTTP that connects to the gateway WebSocket and visualizes telemetry.
+- **`telemetry_gateway`**  
+  Subscribes to MQTT, stores telemetry in SQLite, and exposes:
+  - a **live WebSocket stream**
+  - a **history/replay interface**
 
----
+- **`ui/`**  
+  Browser-based supervisory interface used to:
+  - monitor live telemetry
+  - request recent history
+  - export UI-side CSV logs
 
-## System Requirements
+Data path:
 
-### Tested environment
-- **Windows 11 + WSL2 + Ubuntu**
-- Local broker, simulator, gateway and UI on the same machine (loopback)
+```text
+robot_sim -> MQTT broker -> telemetry_gateway -> SQLite + WebSocket -> browser UI
+```
 
-### Dependencies (Ubuntu / WSL2)
-- `build-essential` (gcc/make)
-- Mosquitto: `mosquitto`, `libmosquitto-dev`, `mosquitto-clients`
-- Protobuf-C: `protobuf-c-compiler`, `libprotobuf-c-dev`
-- SQLite: `sqlite3`, `libsqlite3-dev`
-- Python 3 + pip (for analysis/plots)
+## What this repository is for
 
----
+This testbed is designed to evaluate what the **supervisory interface actually observes** when communication is degraded.
 
-## Installation (Ubuntu / WSL2)
+The experiments used in the paper focus on:
 
-Recommended “combo” command:
+- **Baseline**
+- **Delay**
+- **Loss**
+- **Disconnect + Replay**
+
+The paper reports interface-facing metrics such as:
+
+- effective live update rate
+- recovery time after reconnection
+- replay recovery ratio
+- relative staleness
+
+## Related repositories
+
+- This repository: `Telemetry_Platform_Testbed`
+- Base repository: [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed)
+
+## Requirements
+
+Tested in:
+
+- Windows 11
+- WSL2
+- Ubuntu
+
+Main dependencies:
+
+- `mosquitto`
+- `libmosquitto-dev`
+- `sqlite3`
+- `libsqlite3-dev`
+- `protobuf-c-compiler`
+- `libprotobuf-c-dev`
+- Python 3
+- `pandas`
+- `matplotlib`
+
+Example installation on Ubuntu / WSL2:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential libmosquitto-dev mosquitto mosquitto-clients protobuf-c-compiler libprotobuf-c-dev libsqlite3-dev sqlite3
+sudo apt install -y \
+  build-essential \
+  mosquitto \
+  mosquitto-clients \
+  libmosquitto-dev \
+  protobuf-c-compiler \
+  libprotobuf-c-dev \
+  sqlite3 \
+  libsqlite3-dev \
+  python3 \
+  python3-pip
+
+python3 -m pip install --user pandas matplotlib
 ```
-
-Python (usually already present on Ubuntu). For plotting, you’ll likely want:
-
-```bash
-python3 -m pip install --user matplotlib
-```
-
-> If `analyze_gwstats.py` requires additional packages, install as needed (see “Information pending” at the end).
-
----
 
 ## Build
 
-From repository root:
+Clone and build:
 
 ```bash
+git clone https://github.com/fsuim/Telemetry_Platform_Testbed.git
+cd Telemetry_Platform_Testbed
 make
 ```
 
 Expected binaries:
+
 - `./robot_sim`
 - `./telemetry_gateway`
 
----
+## Quick start
 
-## Quick Start (WSL2 + Windows 11) — Step by step
-
-Open **two WSL terminals** (plus one optional terminal for serving the UI).
-
-### 1) Start the MQTT broker (Mosquitto)
-
-Option A (service):
+### 1. Start the MQTT broker
 
 ```bash
 sudo service mosquitto start
 ```
 
-Option B (foreground verbose):
+### 2. Start the simulator
+
+Example at 50 Hz:
 
 ```bash
-mosquitto -v
+./robot_sim --host 127.0.0.1 --port 1883 --rate 50 --state-rate 50
 ```
 
-### 2) Run the simulator (`robot_sim`) — Terminal 1
-
-**Required example:**
+### 3. Start the gateway
 
 ```bash
-./robot_sim --host 127.0.0.1 --port 1883 --rate 50
+./telemetry_gateway \
+  --mqtt-host 127.0.0.1 \
+  --mqtt-port 1883 \
+  --db telemetry.db \
+  --ws-port 8080
 ```
 
-This publishes:
-- RAW sensor topics (binary)
-- Snapshot topic (Protobuf)
-
-### 3) Run the gateway (`telemetry_gateway`) — Terminal 2
-
-**Required example:**
-
-```bash
-./telemetry_gateway --mqtt-host 127.0.0.1 --mqtt-port 1883 --db telemetry.db --ws-port 8080
-```
-
-What to expect:
-- A SQLite DB file `telemetry.db` appears (WAL mode may create `telemetry.db-wal` / `telemetry.db-shm` while running)
-- The gateway listens for WebSocket connections on port `8080`
-
-### 4) Serve the UI over HTTP — Terminal 3
+### 4. Start the UI
 
 ```bash
 cd ui
 python3 -m http.server 8000
 ```
 
-### 5) Open the UI in your browser (Windows or WSL)
+Open:
 
-- Open: `http://localhost:8000`
-- In the UI, connect to: `ws://localhost:8080`
-
-What to expect:
-- Connection indicator changes to “connected”
-- Telemetry values update live
-- If the UI has a “history” / “last N” option, it should fetch from SQLite via the gateway
-
----
-
-## Sanity Checks (recommended)
-
-### A) Confirm the simulator is publishing RAW data
-
-```bash
-mosquitto_sub -t "/robot/sensors/imu0/acc" -C 1 | wc -c
+```text
+http://localhost:8000
 ```
 
-Interpretation:
-- This prints the byte size of a single message from the RAW IMU accel topic.
-- A non-zero number confirms: **broker reachable + simulator publishing + topic correct**.
+Use:
 
-### B) Confirm the snapshot stream exists (Protobuf payload)
+- **Host:** `localhost`
+- **Port:** `8080`
+- **Path:** `/`
+
+Then click **Connect**.
+
+## Experiment protocol
+
+The paper uses:
+
+- **4 conditions**
+- **2 telemetry rates**
+- **3 repetitions**
+
+Total:
+
+- **24 runs**
+
+Conditions:
+
+1. Baseline
+2. Delay
+3. Loss
+4. Disconnect + Replay
+
+Rates:
+
+- 50 Hz
+- 100 Hz
+
+Each run lasts:
+
+- **60 seconds**
+
+Replay/history setting in the UI:
+
+- **150 samples** for 50 Hz
+- **300 samples** for 100 Hz
+
+Full step-by-step instructions are in [`EXPERIMENTS.md`](./EXPERIMENTS.md).
+
+## Analyze exported UI logs
+
+After collecting the UI CSV logs, run:
+
+```bash
+python3 analyze_ui_logs_with_latex.py \
+  --input-dir ./exp/ui_logs \
+  --output-dir ./exp/results \
+  --pattern "ui_log_*.csv"
+```
+
+Typical outputs:
+
+- aggregated CSV metrics
+- LaTeX tables
+- PNG figures used in the paper
+
+Examples:
+
+- `aggregated_metrics.csv`
+- `table_results_compact.tex`
+- `table_summary_results.tex`
+- `fig_recovery_time_bar.png`
+- `fig_replay_recovery_ratio_bar.png`
+- `fig_staleness_boxplot.png`
+
+## Repository purpose
+
+Compared with the original `Telemetry_Testbed`, this repository is intended specifically for:
+
+- controlled communication impairment experiments
+- supervisory UI logging
+- replay-assisted recovery analysis
+- paper-oriented figure/table generation
+
+## Troubleshooting
+
+### UI does not connect
+
+Check that:
+
+- Mosquitto is running
+- `telemetry_gateway` is listening on port `8080`
+- the browser uses `localhost:8080`
+
+### No telemetry appears
+
+Check the MQTT snapshot stream:
 
 ```bash
 mosquitto_sub -t "/robot/v1/telemetry/state" -C 1 | wc -c
 ```
 
-Interpretation:
-- Confirms a consolidated snapshot is being published on the snapshot topic.
+### Replay does not happen after disconnect
 
-### C) Confirm the gateway WebSocket is listening
+Make sure the disconnect condition is started with:
 
-```bash
-ss -ltnp | grep 8080 || true
-```
+- `--ui-cut-start-s 20`
+- `--ui-cut-duration-s 3`
+- `--ui-reconnect-mode close`
 
----
+and that the UI remains open for the full run.
 
-## Architecture and Topics
+## License
 
-### Snapshot vs RAW topics
-
-- **RAW topics:** sensor-specific binary payloads published on separate MQTT topics (minimal overhead, deterministic layout).
-- **Snapshot:** a consolidated **Protobuf** message (“photo of system state”) published periodically on a single topic. This is what the gateway logs to SQLite and replays to the UI.
-
-### End-to-end dataflow
-
-`robot_sim` → **MQTT (Mosquitto)** → `telemetry_gateway` → **SQLite + WebSocket (JSON)** → `ui/`
-
-### Default ports
-
-| Component | Purpose | Default |
-|---|---|---:|
-| Mosquitto | MQTT broker | 1883 |
-| telemetry_gateway | WebSocket server | 8080 |
-| python http.server | UI HTTP server | 8000 |
-
-### Main MQTT topics
-
-**Snapshot**
-- `/robot/v1/telemetry/state`
-
-**RAW (examples / main set)**
-- `/robot/sensors/imu0/acc`
-- `/robot/sensors/imu0/gyro`
-- `/robot/sensors/tilt0/tilt`
-- `/robot/sensors/motor1/tics`
-- `/robot/sensors/motor1/rpm`
-- `/robot/sensors/motor1/temperature`
-- `/robot/sensors/motor1/voltage_power_stage`
-- `/robot/sensors/motor1/current_power_stage`
-- `/robot/sensors/motor2/...` (same pattern as motor1)
-
-> If your local checkout differs (topic names, number of motors/sensors), see “Information pending” at the end and adjust accordingly.
-
----
-
-## Reproducing the Experiment from the Paper Submission (`run_sweep.sh`)
-
-This repository includes an experiment driver script that runs a sweep over snapshot rates and SQLite batching, logs gateway stats, and generates CSV + figures.
-
-### Prerequisites
-- Broker running (Mosquitto)
-- Binaries built (`make`)
-- You can create folders in the repo directory (`logs/`, `db/`, `results/`)
-
-### What the script does (faithful to the provided `run_sweep.sh`)
-- Duration per configuration: **60 seconds**
-- RAW sensors fixed at: **50 Hz** (`SENSOR_RATE=50`)
-- Snapshot rate sweep (`--state-rate`): **20, 50, 100, 200 Hz**
-- SQLite batch sweep (`--batch`): **1 and 50**
-- Creates output folders: `logs/`, `db/`, `results/`
-- For each configuration:
-  - Runs `telemetry_gateway` in background with `--stats` and logs stderr to a file
-  - Runs `robot_sim` for 60 seconds with the chosen snapshot rate
-  - Stops the gateway and saves DB + log
-- After the sweep:
-  - Runs `python3 analyze_gwstats.py ...` to produce CSV + figures in `results/`
-
-### Run it
-
-```bash
-chmod +x run_sweep.sh
-./run_sweep.sh
-```
-
-### Output locations and naming
-
-For each `(batch, rate)` pair:
-
-- Database:
-  - `db/run_b${B}_r${R}.db`
-  - Examples: `db/run_b1_r20.db`, `db/run_b50_r200.db`
-
-- Gateway stats log:
-  - `logs/gw_b${B}_r${R}.log`
-  - Examples: `logs/gw_b1_r20.log`, `logs/gw_b50_r200.log`
-
-After analysis:
-
-- `results/` will contain:
-  - `*.csv` (aggregated metrics)
-  - figure files (commonly `*.png` / `*.pdf` / `*.svg`, depending on the script)
-
-### Typical extracted metrics 
-Depending on the analysis implementation, typical metrics include:
-- achieved snapshot RX throughput (messages per second)
-- SQLite insert rate (rows per second)
-- commit/transaction timing (especially batch=1 vs batch=50)
-- payload size (bytes per snapshot)
-- backlog/queue growth indicators (if logged)
-- storage cost (bytes/sample; DB size vs number of samples)
-
-### Python plotting
-At minimum:
-
-```bash
-python3 -m pip install --user matplotlib
-```
-
-If needed, install additional dependencies required by `analyze_gwstats.py`.
-
----
-
-## Troubleshooting
-
-### Mosquitto won’t start / port 1883 is in use
-
-```bash
-sudo service mosquitto status
-ss -ltnp | grep 1883 || true
-sudo lsof -i :1883
-```
-
-If you started `mosquitto -v` in a terminal, stop it with `Ctrl+C`.
-
-### UI does not connect to WebSocket (`ws://localhost:8080`)
-- Confirm gateway is running:
-  ```bash
-  ss -ltnp | grep 8080 || true
-  ```
-- Confirm you are using the correct URL in the UI: `ws://localhost:8080`
-- If opening the UI in Windows while services run in WSL2, `localhost` usually works; if not, try using the WSL2 IP for debugging.
-
-### No telemetry appears
-- Check snapshot topic:
-  ```bash
-  mosquitto_sub -t "/robot/v1/telemetry/state" -C 1 | wc -c
-  ```
-- Check a RAW topic:
-  ```bash
-  mosquitto_sub -t "/robot/sensors/imu0/acc" -C 1 | wc -c
-  ```
-
-### Permission / paths (`db/`, `logs/`, `results/`)
-```bash
-mkdir -p db logs results
-```
-
-If you cloned into `/mnt/c/...`, consider moving the repo into your WSL home directory for fewer filesystem/permission edge-cases.
-
-### Stopping processes
-- Foreground processes: `Ctrl+C`
-- Background gateway in scripts: use `kill <PID>` if needed
-- Quick “find and kill” (use carefully):
-  ```bash
-  pgrep -a telemetry_gateway || true
-  pgrep -a robot_sim || true
-  ```
-
-### Useful live diagnostics
-- Tail logs:
-  ```bash
-  tail -f logs/*.log
-  ```
-- Inspect MQTT topics:
-  ```bash
-  mosquitto_sub -t "/robot/#" -v
-  ```
-
----
-
-## Reproducibility Notes
-
-- **Primary target environment:** WSL2 + Ubuntu on Windows 11, local broker and processes.
-- **Python:** recommend 3.10+ (Ubuntu default versions are fine).
-- **Scope:** this setup is designed for controlled local runs. Performance characteristics will differ on real networks (latency/jitter/loss).
-
----
-
-## Information pending (placeholders — please do not assume)
-
-If any of these differ in your checkout, they should be clarified/updated for artifact evaluation:
-
-- **Exact CLI defaults used by `run_sweep.sh`:**
-  - The script runs `./telemetry_gateway --db ... --batch ... --stats` without explicitly setting `--mqtt-host/--mqtt-port/--ws-port`.
-  - The script runs `./robot_sim --rate ... --state-rate ...` without explicitly setting `--host/--port`.
-  - If your binaries do not default to `127.0.0.1:1883` and `ws-port=8080`, update the script or pass explicit flags.
-- **Python dependencies for `analyze_gwstats.py`:**
-  - Besides `matplotlib`, confirm whether it needs `numpy`, `pandas`, etc., and provide `requirements.txt` if available.
-- **Final authoritative RAW topic list and payload sizes:**
-  - This README lists the main topics; confirm any additions/removals in your simulator build.
-- **Expected figure/CSV filenames in `results/`:**
-  - Document the exact filenames once stabilized.
+Please follow the repository license and cite the corresponding paper if you reuse this setup.
