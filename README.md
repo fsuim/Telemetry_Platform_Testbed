@@ -2,7 +2,7 @@
 
 A lightweight telemetry platform for **interface-level evaluation of supervisory telemetry systems** under degraded communication conditions.
 
-This repository accompanies our AIM 2026 paper on **replay-assisted technical evaluation of supervisory telemetry interfaces**. It is based on [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed), but the **experimental design, impairment scenarios, UI logging workflow, and evaluation purpose are different** in this version.
+This repository accompanies our IECON 2026 paper on **Replay-Assisted Observability Assessment of Industrial Robotic Telemetry Interfaces Under Communication Impairments**. It is based on [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed), but the **experimental design, impairment scenarios, UI logging workflow, and evaluation purpose are different** in this version.
 
 ## Overview
 
