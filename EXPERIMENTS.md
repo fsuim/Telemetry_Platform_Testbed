@@ -1,6 +1,6 @@
 # Experiment protocol: reconnect-only versus replay-assisted recovery
 
-This document describes the current reproducible experiment for the telemetry platform. It replaces the previous generic degraded-communication protocol and keeps the repository reusable for future studies.
+This document describes the current reproducible experiment for the telemetry platform.
 
 The goal is to measure interface-level telemetry continuity during a planned gateway-to-UI WebSocket disconnection and to compare two post-disconnection recovery modes:
 
