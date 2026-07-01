@@ -1,77 +1,112 @@
 # Telemetry_Platform_Testbed
 
-A lightweight telemetry platform for **interface-level evaluation of supervisory telemetry systems** under degraded communication conditions.
+A lightweight telemetry platform for reproducible, interface-level evaluation of supervisory telemetry systems under transient disconnection and replay-assisted recovery.
 
-This repository accompanies our IECON 2026 paper on **Replay-Assisted Observability Assessment of Industrial Robotic Telemetry Interfaces Under Communication Impairments**. It is based on [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed), but the **experimental design, impairment scenarios, UI logging workflow, and evaluation purpose are different** in this version.
+The repository provides a complete local testbed for asking a specific question: when the telemetry source and gateway continue to produce and persist robot-state samples, what does the browser-based supervisory interface actually observe, miss, and recover after a temporary UI-facing disconnection?
 
-## Overview
+The project is intentionally focused on structured telemetry, not video streaming or closed-loop control. It is useful for early validation of supervisory interfaces before physical-robot trials or human-subject experiments.
 
-The platform has three main parts:
+## System overview
 
-- **`robot_sim`**  
-  Publishes telemetry snapshots to MQTT.
+The platform contains three runtime components:
 
-- **`telemetry_gateway`**  
-  Subscribes to MQTT, stores telemetry in SQLite, and exposes:
-  - a **live WebSocket stream**
-  - a **history/replay interface**
-
-- **`ui/`**  
-  Browser-based supervisory interface used to:
-  - monitor live telemetry
-  - request recent history
-  - export UI-side CSV logs
+- `robot_sim`: publishes simulated robot-state telemetry snapshots to MQTT.
+- `telemetry_gateway`: subscribes to MQTT, timestamps incoming samples, persists them in SQLite, and exposes both a live WebSocket stream and a replay/history interface.
+- `ui/`: browser-based supervisory interface used to display live telemetry, request replay/history samples, and export UI-side CSV logs.
 
 Data path:
 
 ```text
-robot_sim -> MQTT broker -> telemetry_gateway -> SQLite + WebSocket -> browser UI
+robot_sim -> MQTT broker -> telemetry_gateway -> SQLite persistence
+                                      |
+                                      +-> WebSocket live stream -> browser UI
+                                      +-> replay/history request -> browser UI
 ```
 
-## What this repository is for
+The disconnection used in the current experiment is injected only on the gateway-to-UI WebSocket path, after gateway persistence. This means that data can still be present in the gateway database while being temporarily unavailable to the browser UI. Replay is therefore evaluated as a context-recovery mechanism for the interface, not as a replacement transport protocol.
 
-This testbed is designed to evaluate what the **supervisory interface actually observes** when communication is degraded.
+## Telemetry schema
 
-The experiments used in the paper focus on:
+Each telemetry sample is a structured robot-state snapshot with ordering, motion, orientation, and actuator-state fields:
 
-- **Baseline**
-- **Delay**
-- **Loss**
-- **Disconnect + Replay**
+| Group | Variables | Interface role |
+|---|---|---|
+| Header | `robot_id`, `timestamp_ns`, `seq` | identity, ordering, freshness |
+| IMU | `acc_g`, `gyro_dps` | motion monitoring |
+| Tilt | `tilt_deg`, `tilt_status` | orientation and abnormal-state monitoring |
+| Motors | `ticks`, `rpm`, `temperature`, `voltage`, `current` | actuator-state monitoring |
 
-The paper reports interface-facing metrics such as:
+The experiment is designed around update freshness, sequence continuity, disconnect/reconnect behavior, and replay-based recovery of missed sequence identifiers.
 
-- effective live update rate
-- recovery time after reconnection
-- replay recovery ratio
-- relative staleness
+## Current experiment
 
-## Related repositories
+The current reproducible experiment compares two recovery modes after the same planned UI-facing WebSocket outage:
 
-- This repository: `Telemetry_Platform_Testbed`
-- Base repository: [`Telemetry_Testbed`](https://github.com/fsuim/Telemetry_Testbed)
+| Mode | Description |
+|---|---|
+| `reconnect_only` | The WebSocket reconnects, but the UI is prevented from requesting history. Missed sequence identifiers remain unrecovered by definition. |
+| `disconnect_replay` | The WebSocket reconnects and the UI requests a recent persisted history window immediately after reconnection. |
+
+Experiment matrix:
+
+| Parameter | Value |
+|---|---|
+| Telemetry rates | `25`, `50`, `75`, `100`, `150` Hz |
+| Repetitions | `10` per rate per mode |
+| Total runs | `100` |
+| Run duration | `60` s |
+| UI cut start | `20` s after run start |
+| Planned UI cut duration | `3` s |
+| Post-run wait used by automation | `8` s |
+| Replay window | `rate_hz * 3 s` samples |
+
+Replay-window mapping:
+
+| Rate | Replay window |
+|---:|---:|
+| 25 Hz | 75 samples |
+| 50 Hz | 150 samples |
+| 75 Hz | 225 samples |
+| 100 Hz | 300 samples |
+| 150 Hz | 450 samples |
+
+The main metrics generated by the analysis are:
+
+- effective live update rate;
+- live-missing samples within the disconnect-and-recovery target interval;
+- samples recovered through replay;
+- still-unrecovered samples;
+- post-reopen live-stream stabilization time;
+- replay recovery ratio;
+- relative timestamp offset at the UI.
+
+`relative timestamp offset` is an application-level diagnostic based on gateway and UI timestamps. It should be used for relative comparison within this testbed, not as a transport-grade latency measurement unless the clocks are synchronized for that purpose.
+
+## Repository structure
+
+```text
+.
+├── robot_main.c, sensors/, telemetry_state_pub.*
+│   Robot telemetry simulator and simulated sensors
+├── telemetry_gateway_main.c, telemetry_gateway.*
+│   MQTT subscriber, SQLite persistence, WebSocket forwarding, replay support
+├── ws_server.*
+│   UI-facing WebSocket server and impairment controls
+├── ui/
+│   Browser supervisory interface
+├── experiments/disconnect_replay_rate_sweep/
+│   Automated experiment runners, Playwright UI export automation, analysis script
+├── exp/
+│   Recommended location for generated databases, UI logs, and analysis results
+└── paper/
+    Optional destination for publication-ready tables and figures copied by the analysis script
+```
 
 ## Requirements
 
-Tested in:
+Tested on Ubuntu/WSL-style environments. Native Linux is recommended for the automated runs.
 
-- Windows 11
-- WSL2
-- Ubuntu
-
-Main dependencies:
-
-- `mosquitto`
-- `libmosquitto-dev`
-- `sqlite3`
-- `libsqlite3-dev`
-- `protobuf-c-compiler`
-- `libprotobuf-c-dev`
-- Python 3
-- `pandas`
-- `matplotlib`
-
-Example installation on Ubuntu / WSL2:
+System packages:
 
 ```bash
 sudo apt update
@@ -86,170 +121,363 @@ sudo apt install -y \
   libsqlite3-dev \
   python3 \
   python3-pip
+```
 
-python3 -m pip install --user pandas matplotlib
+Python packages:
+
+```bash
+python3 -m pip install --user pandas matplotlib playwright
+python3 -m playwright install chromium
+```
+
+On a fresh WSL/Ubuntu installation, Playwright may also require browser system dependencies:
+
+```bash
+python3 -m playwright install-deps chromium
 ```
 
 ## Build
 
-Clone and build:
+From the repository root:
 
 ```bash
-git clone https://github.com/fsuim/Telemetry_Platform_Testbed.git
-cd Telemetry_Platform_Testbed
+make clean
 make
 ```
 
 Expected binaries:
 
-- `./robot_sim`
-- `./telemetry_gateway`
+```text
+./robot_sim
+./telemetry_gateway
+./state_dump
+```
 
-## Quick start
+If you use a ZIP archive created on another operating system and existing binaries or scripts are not executable, rebuild with `make clean && make` and run shell scripts using `bash <script>`.
 
-### 1. Start the MQTT broker
+## Quick manual run
+
+This section is only for checking that the stack works. The full reproducible experiment is automated in the next section.
+
+Start the MQTT broker:
 
 ```bash
 sudo service mosquitto start
 ```
 
-### 2. Start the simulator
-
-Example at 50 Hz:
+Start the simulator at 50 Hz:
 
 ```bash
 ./robot_sim --host 127.0.0.1 --port 1883 --rate 50 --state-rate 50
 ```
 
-### 3. Start the gateway
+In another terminal, start the gateway:
 
 ```bash
 ./telemetry_gateway \
   --mqtt-host 127.0.0.1 \
   --mqtt-port 1883 \
-  --db telemetry.db \
-  --ws-port 8080
+  --db ./exp/db/manual_test.db \
+  --ws-port 8080 \
+  --ui-exp-tag manual_test
 ```
 
-### 4. Start the UI
+In another terminal, start the UI server:
 
 ```bash
-cd ui
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory ./ui
 ```
 
-Open:
+Open the UI:
 
 ```text
 http://localhost:8000
 ```
 
-Use:
+Use these UI values:
 
-- **Host:** `localhost`
-- **Port:** `8080`
-- **Path:** `/`
+```text
+Host: localhost
+Port: 8080
+Path: /
+Last N samples: 150
+```
 
-Then click **Connect**.
+Click `Connect`. After confirming live telemetry, use `Export UI log` to download a CSV log.
 
-## Experiment protocol
+## Full automated experiment
 
-The paper uses:
+The automated experiment creates UI CSV logs in `./exp/ui_logs`, databases and process logs in `./exp/db`, and validates each run.
 
-- **4 conditions**
-- **2 telemetry rates**
-- **3 repetitions**
-
-Total:
-
-- **24 runs**
-
-Conditions:
-
-1. Baseline
-2. Delay
-3. Loss
-4. Disconnect + Replay
-
-Rates:
-
-- 50 Hz
-- 100 Hz
-
-Each run lasts:
-
-- **60 seconds**
-
-Replay/history setting in the UI:
-
-- **150 samples** for 50 Hz
-- **300 samples** for 100 Hz
-
-Full step-by-step instructions are in [`EXPERIMENTS.md`](./EXPERIMENTS.md).
-
-## Analyze exported UI logs
-
-After collecting the UI CSV logs, run:
+Start Mosquitto first:
 
 ```bash
-python3 analyze_ui_logs_with_latex.py \
+sudo service mosquitto start
+```
+
+Create output folders:
+
+```bash
+mkdir -p exp/db exp/ui_logs exp/results/reconnect_only_vs_replay paper
+```
+
+Run the reconnect-only baseline:
+
+```bash
+REPS=10 RATES="25 50 75 100 150" \
+bash experiments/disconnect_replay_rate_sweep/run_reconnect_only_matrix_auto.sh
+```
+
+Run the replay-assisted condition:
+
+```bash
+REPS=10 RATES="25 50 75 100 150" \
+bash experiments/disconnect_replay_rate_sweep/run_disconnect_replay_matrix_auto.sh
+```
+
+By default, both scripts start the UI HTTP server automatically on port `8000`, use WebSocket port `8080`, and run the browser automation in headless mode.
+
+To watch the browser during debugging, set `HEADLESS=0`:
+
+```bash
+HEADLESS=0 REPS=1 RATES="25" \
+bash experiments/disconnect_replay_rate_sweep/run_disconnect_replay_matrix_auto.sh
+```
+
+To repeat only one failed run, use `START_REP` and `END_REP`:
+
+```bash
+HEADLESS=0 REPS=10 RATES="150" START_REP=7 END_REP=7 \
+bash experiments/disconnect_replay_rate_sweep/run_disconnect_replay_matrix_auto.sh
+```
+
+Useful environment variables supported by both runners:
+
+| Variable | Default | Meaning |
+|---|---:|---|
+| `RATES` | `25 50 75 100 150` | Space-separated telemetry rates |
+| `REPS` | `10` | Number of repetitions per rate |
+| `START_REP`, `END_REP` | `1`, `$REPS` | Subset of repetitions to run |
+| `RUN_DURATION_S` | `60` | Telemetry run duration |
+| `POST_RUN_WAIT_S` | `8` | Extra wait before exporting the UI log |
+| `CUT_START_S` | `20` | Planned WebSocket cut start |
+| `CUT_DURATION_S` | `3` | Planned WebSocket cut duration |
+| `HEADLESS` | `1` | Use `0` for visible browser debugging |
+| `START_UI_SERVER` | `1` | Use `0` if an HTTP server is already running |
+| `DB_DIR` | `./exp/db` | Output directory for SQLite DBs and process logs |
+| `UI_LOG_DIR` | `./exp/ui_logs` | Output directory for exported UI CSV logs |
+
+## Expected run tags and files
+
+The automation uses deterministic file names:
+
+```text
+ui_log_reconnect_only_r25_rep1.csv
+ui_log_reconnect_only_r25_rep2.csv
+...
+ui_log_reconnect_only_r150_rep10.csv
+ui_log_disconnect_replay_r25_rep1.csv
+ui_log_disconnect_replay_r25_rep2.csv
+...
+ui_log_disconnect_replay_r150_rep10.csv
+```
+
+Each run also creates a matching database and process logs under `exp/db/`, for example:
+
+```text
+exp/db/reconnect_only_r25_rep1.db
+exp/db/reconnect_only_r25_rep1_gateway.log
+exp/db/reconnect_only_r25_rep1_robot.log
+```
+
+## Run validation
+
+The automated runners stop with an error if a run does not satisfy the expected condition.
+
+For `reconnect_only`, the UI log must contain:
+
+- at least two `ws_open` events;
+- enough live telemetry rows for the configured rate and duration;
+- no `history_request` rows;
+- no `history_batch_loaded` rows;
+- no `telemetry,replay` rows.
+
+For `disconnect_replay`, the UI log must contain:
+
+- at least two `ws_open` events;
+- enough live telemetry rows for the configured rate and duration;
+- exactly one `history_request` row;
+- exactly one `history_batch_loaded` row;
+- exactly `rate_hz * CUT_DURATION_S` replay rows.
+
+If a validation error occurs, inspect the corresponding `*_gateway.log` and `*_robot.log` files in `exp/db/`, then rerun only the affected repetition with `START_REP` and `END_REP`.
+
+## Analyze the UI logs
+
+After collecting the reconnect-only and replay-assisted UI CSV logs, run:
+
+```bash
+python3 experiments/disconnect_replay_rate_sweep/analyze_rate_sweep_with_baseline.py \
   --input-dir ./exp/ui_logs \
-  --output-dir ./exp/results \
+  --output-dir ./exp/results/reconnect_only_vs_replay \
+  --paper-output-dir ./paper \
   --pattern "ui_log_*.csv"
 ```
 
-Typical outputs:
+This is the command used to regenerate the figures and tables from the experiment logs.
 
-- aggregated CSV metrics
-- LaTeX tables
-- PNG figures used in the paper
+Generated analysis outputs include:
 
-Examples:
+```text
+exp/results/reconnect_only_vs_replay/aggregated_metrics.csv
+exp/results/reconnect_only_vs_replay/run_metrics.csv
+exp/results/reconnect_only_vs_replay/validation_warnings.csv
+exp/results/reconnect_only_vs_replay/table_reconnect_only_vs_replay.tex
+exp/results/reconnect_only_vs_replay/table_disconnect_replay_rate_sweep.tex
+exp/results/reconnect_only_vs_replay/table_summary_results.tex
+exp/results/reconnect_only_vs_replay/fig_disconnect_replay_summary_panel.png
+exp/results/reconnect_only_vs_replay/fig_recovered_vs_missing.pdf
+exp/results/reconnect_only_vs_replay/fig_recovered_vs_missing.png
+exp/results/reconnect_only_vs_replay/fig_staleness_boxplot.png
+```
 
-- `aggregated_metrics.csv`
-- `table_results_compact.tex`
-- `table_summary_results.tex`
-- `fig_recovery_time_bar.png`
-- `fig_replay_recovery_ratio_bar.png`
-- `fig_staleness_boxplot.png`
+When `--paper-output-dir ./paper` is provided, publication-ready copies of the same figures, tables, and CSV summaries are also copied to `./paper`.
 
-## Repository purpose
+If the script prints:
 
-Compared with the original `Telemetry_Testbed`, this repository is intended specifically for:
+```text
+WARNING: Some logs contain validation warnings. See validation_warnings.csv
+```
 
-- controlled communication impairment experiments
-- supervisory UI logging
-- replay-assisted recovery analysis
-- paper-oriented figure/table generation
+open `validation_warnings.csv` and inspect the affected run tags before using the aggregated results.
+
+## Manual single-run examples
+
+Reconnect-only, 100 Hz, repetition 1:
+
+```bash
+./robot_sim --host 127.0.0.1 --port 1883 --rate 100 --state-rate 100
+```
+
+```bash
+./telemetry_gateway \
+  --mqtt-host 127.0.0.1 \
+  --mqtt-port 1883 \
+  --db ./exp/db/reconnect_only_r100_rep1.db \
+  --ws-port 8080 \
+  --ui-cut-start-s 20 \
+  --ui-cut-duration-s 3 \
+  --ui-reconnect-mode close \
+  --ui-exp-tag reconnect_only_r100_rep1
+```
+
+In the UI automation or manual UI, use `Last N samples = 0` and prevent/avoid history requests.
+
+Replay-assisted, 100 Hz, repetition 1:
+
+```bash
+./robot_sim --host 127.0.0.1 --port 1883 --rate 100 --state-rate 100
+```
+
+```bash
+./telemetry_gateway \
+  --mqtt-host 127.0.0.1 \
+  --mqtt-port 1883 \
+  --db ./exp/db/disconnect_replay_r100_rep1.db \
+  --ws-port 8080 \
+  --ui-cut-start-s 20 \
+  --ui-cut-duration-s 3 \
+  --ui-reconnect-mode close \
+  --ui-exp-tag disconnect_replay_r100_rep1
+```
+
+In the UI, use `Last N samples = 300`, connect, wait for the planned cut and reconnect, then export the UI log as:
+
+```text
+exp/ui_logs/ui_log_disconnect_replay_r100_rep1.csv
+```
 
 ## Troubleshooting
 
-### UI does not connect
+### The UI does not connect
 
-Check that:
+Check that the gateway is listening:
 
-- Mosquitto is running
-- `telemetry_gateway` is listening on port `8080`
-- the browser uses `localhost:8080`
+```bash
+ss -ltnp | grep 8080 || true
+```
+
+Check that the browser fields are correct:
+
+```text
+Host: localhost
+Port: 8080
+Path: /
+```
 
 ### No telemetry appears
 
-Check the MQTT snapshot stream:
+Check that Mosquitto is running and that the simulator is publishing:
 
 ```bash
+sudo service mosquitto status
 mosquitto_sub -t "/robot/v1/telemetry/state" -C 1 | wc -c
 ```
 
-### Replay does not happen after disconnect
+### A port is stuck after a failed run
 
-Make sure the disconnect condition is started with:
+Find and stop stale processes:
 
-- `--ui-cut-start-s 20`
-- `--ui-cut-duration-s 3`
-- `--ui-reconnect-mode close`
+```bash
+ps aux | grep -E 'telemetry_gateway|robot_sim|http.server' | grep -v grep
+fuser -n tcp 8080
+fuser -n tcp 8000
+```
 
-and that the UI remains open for the full run.
+### Playwright cannot find UI fields
 
-## License
+Run with a visible browser:
 
-Please follow the repository license and cite the corresponding paper if you reuse this setup.
+```bash
+HEADLESS=0 REPS=1 RATES="25" bash experiments/disconnect_replay_rate_sweep/run_disconnect_replay_matrix_auto.sh
+```
+
+If the UI labels or selectors have changed, pass explicit selectors through the environment variables supported by the runner:
+
+```bash
+UI_HOST_SELECTOR="#host" \
+UI_PORT_SELECTOR="#port" \
+UI_PATH_SELECTOR="#path" \
+UI_LAST_N_SELECTOR="#lastN" \
+UI_CONNECT_SELECTOR="#connectBtn" \
+UI_EXPORT_SELECTOR="#exportBtn" \
+bash experiments/disconnect_replay_rate_sweep/run_disconnect_replay_matrix_auto.sh
+```
+
+### Replay rows are missing in the replay-assisted condition
+
+Verify that the runner banner is for `disconnect+replay`, that `Last N` is equal to `rate_hz * 3`, and that the UI remained open for the full run plus the post-run wait.
+
+### Reconnect-only contains replay rows
+
+Use the provided reconnect-only runner. It installs browser-side blockers and forces `Last N = 0` to prevent history/replay requests during the baseline.
+
+## Cleaning generated artifacts
+
+To rerun from scratch:
+
+```bash
+rm -rf exp/db exp/ui_logs exp/results/reconnect_only_vs_replay paper
+mkdir -p exp/db exp/ui_logs exp/results/reconnect_only_vs_replay paper
+```
+
+To rebuild binaries:
+
+```bash
+make clean
+make
+```
+
+## License and reuse
+
+Use the repository according to its license. When reusing the platform or generated artifacts, document the exact run matrix, telemetry rates, replay windows, software commit, and analysis command so that results remain reproducible.
