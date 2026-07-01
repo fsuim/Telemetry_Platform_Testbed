@@ -1,49 +1,30 @@
-# Prerequisites
-*.d
-
-# Object files
+# Build outputs
+build/*
+!build/.gitkeep
+bin/*
+!bin/.gitkeep
 *.o
-*.ko
+*.d
 *.obj
 *.elf
+*.out
+*.exe
 
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
+# Libraries / shared objects
 *.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
 *.so
 *.so.*
 *.dylib
+*.dll
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
+# Debug and compiler artifacts
+*.gch
+*.pch
 *.dSYM/
 *.su
 *.idb
 *.pdb
-
-# Kernel Module Compile Results
-*.mod*
+*.dwo
 *.cmd
 .tmp_versions/
 modules.order
@@ -51,17 +32,23 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# debug information files
-*.dwo
-
-# SQLite
+# Runtime outputs
 *.db
-*.venv
-*.log
-/results/
-*.o
-robot_sim
-state_dump
-telemetry_gateway
 *.db-wal
 *.db-shm
+*.log
+exp/db/
+exp/ui_logs/
+exp/results/
+results/
+
+# Local environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Legacy root-level binaries; binaries should be built under bin/
+/robot_sim
+/telemetry_gateway
+/state_dump

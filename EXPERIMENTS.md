@@ -92,6 +92,16 @@ make clean
 make
 ```
 
+The build writes object files to `build/` and executable binaries to `bin/`:
+
+```text
+bin/robot_sim
+bin/telemetry_gateway
+bin/state_dump
+```
+
+The generated protobuf-c files are already included. Run `make proto` only after editing `proto/robot_telemetry.proto`.
+
 Start Mosquitto:
 
 ```bash
@@ -203,6 +213,8 @@ Both automated scripts accept the following environment variables:
 | `UI_LOG_DIR` | `./exp/ui_logs` | Exported browser/UI CSV logs |
 | `HEADLESS` | `1` | `1` = headless browser, `0` = visible browser |
 | `START_UI_SERVER` | `1` | `1` = runner starts UI server |
+| `ROBOT_BIN` | `./bin/robot_sim` | Path to the simulator binary used by the runners |
+| `GATEWAY_BIN` | `./bin/telemetry_gateway` | Path to the gateway binary used by the runners |
 
 Selectors can be overridden if the UI markup changes:
 
@@ -298,13 +310,13 @@ The automated scripts are preferred. Use the manual protocol only for debugging 
 Terminal 1:
 
 ```bash
-./robot_sim --host 127.0.0.1 --port 1883 --rate 50 --state-rate 50
+./bin/robot_sim --host 127.0.0.1 --port 1883 --rate 50 --state-rate 50
 ```
 
 Terminal 2:
 
 ```bash
-./telemetry_gateway \
+./bin/telemetry_gateway \
   --mqtt-host 127.0.0.1 \
   --mqtt-port 1883 \
   --db ./exp/db/reconnect_only_r50_rep1.db \
@@ -342,7 +354,7 @@ exp/ui_logs/ui_log_reconnect_only_r50_rep1.csv
 Use the same simulator and UI server, but start the gateway with:
 
 ```bash
-./telemetry_gateway \
+./bin/telemetry_gateway \
   --mqtt-host 127.0.0.1 \
   --mqtt-port 1883 \
   --db ./exp/db/disconnect_replay_r50_rep1.db \

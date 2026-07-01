@@ -49,7 +49,7 @@
     pendingRecovery: false,
     reconnectTimer: null,
     autoReconnect: true,
-    reconnectDelayMs: 500,
+    reconnectDelayMs: 3200,
     reconnectCount: 0,
 
     samples: [],
@@ -630,7 +630,7 @@
         state.reconnectTimer = null;
       }
       logUiEvent({ event: 'ws_open' });
-      if (state.pendingRecovery) {
+      if (state.pendingRecovery && getRequestedHistoryCount() > 0) {
         requestHistory();
       }
     };
@@ -687,12 +687,26 @@
     }
   }
 
+  function getRequestedHistoryCount() {
+    const raw = Number(els.lastN?.value ?? 0);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return Math.min(5000, Math.trunc(raw));
+  }
+
   function requestHistory() {
+    const n = getRequestedHistoryCount();
+
+    // Baseline reconnect-only support:
+    // Last N = 0 means history/replay is disabled. Return before logging
+    // or sending anything so the UI log contains no history_request event.
+    if (n <= 0) return false;
+
     const ws = state.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const n = Math.max(1, Math.min(5000, Number(els.lastN.value || 300)));
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+
     logUiEvent({ event: 'history_request', last: n });
     ws.send(JSON.stringify({ type: 'history', last: n }));
+    return true;
   }
 
   function clearAll() {

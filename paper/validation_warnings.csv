@@ -1,0 +1,26 @@
+file_name,condition,rate_hz,repetition,validation_warning,replay_count,history_requests,history_loaded
+ui_log_disconnect_replay_r25_rep2.csv,disconnect_replay,25,2,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 75 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r25_rep4.csv,disconnect_replay,25,4,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 75 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r25_rep6.csv,disconnect_replay,25,6,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 75 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r25_rep8.csv,disconnect_replay,25,8,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 75 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r25_rep10.csv,disconnect_replay,25,10,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 75 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r50_rep2.csv,disconnect_replay,50,2,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 150 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r50_rep4.csv,disconnect_replay,50,4,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 150 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r50_rep6.csv,disconnect_replay,50,6,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 150 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r50_rep8.csv,disconnect_replay,50,8,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 150 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r50_rep10.csv,disconnect_replay,50,10,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 150 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r75_rep2.csv,disconnect_replay,75,2,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 225 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r75_rep4.csv,disconnect_replay,75,4,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 225 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r75_rep6.csv,disconnect_replay,75,6,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 225 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r75_rep8.csv,disconnect_replay,75,8,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 225 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r75_rep10.csv,disconnect_replay,75,10,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 225 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r100_rep2.csv,disconnect_replay,100,2,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 300 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r100_rep4.csv,disconnect_replay,100,4,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 300 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r100_rep6.csv,disconnect_replay,100,6,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 300 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r100_rep8.csv,disconnect_replay,100,8,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 300 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r100_rep10.csv,disconnect_replay,100,10,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 300 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r150_rep2.csv,disconnect_replay,150,2,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 450 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r150_rep4.csv,disconnect_replay,150,4,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 450 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r150_rep6.csv,disconnect_replay,150,6,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 450 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r150_rep8.csv,disconnect_replay,150,8,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 450 replay rows, found 0",0,0,0
+ui_log_disconnect_replay_r150_rep10.csv,disconnect_replay,150,10,"expected 1 history_request, found 0; expected 1 history_batch_loaded, found 0; expected 450 replay rows, found 0",0,0,0
