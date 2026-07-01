@@ -480,4 +480,4 @@ make
 
 ## License and reuse
 
-Use the repository according to its license. When reusing the platform or generated artifacts, document the exact run matrix, telemetry rates, replay windows, software commit, and analysis command so that results remain reproducible.
+Use the repository according to its license.
